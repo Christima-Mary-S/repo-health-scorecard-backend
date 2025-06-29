@@ -46,7 +46,34 @@ function medianResolutionTime(issues) {
     : durations[mid];
 }
 
+/**
+ * Compute median PR review duration (in hours).
+ * Uses merged_at if available, otherwise closed_at.
+ *
+ * @param {Array<{ created_at: string, merged_at: string|null, closed_at: string|null }>} prs
+ * @returns {number} Median hours, or 0 if none closed/merged.
+ */
+function medianPRDuration(prs) {
+  const durations = prs
+    .map((pr) => {
+      const start = new Date(pr.created_at);
+      const endDate = pr.merged_at || pr.closed_at;
+      if (!endDate) return null;
+      const end = new Date(endDate);
+      return (end - start) / (1000 * 60 * 60);
+    })
+    .filter((d) => d !== null)
+    .sort((a, b) => a - b);
+
+  if (durations.length === 0) return 0;
+  const mid = Math.floor(durations.length / 2);
+  return durations.length % 2 === 0
+    ? (durations[mid - 1] + durations[mid]) / 2
+    : durations[mid];
+}
+
 module.exports = {
   computeWeeklyAverage,
   medianResolutionTime,
+  medianPRDuration,
 };

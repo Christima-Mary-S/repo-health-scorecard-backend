@@ -37,16 +37,14 @@ app.get("/error-test", (req, res, next) => {
   next(err);
 });
 
-app.get("/api/score/issues-test/:owner/:repo", async (req, res, next) => {
+app.get("/api/score/prs-test/:owner/:repo", async (req, res, next) => {
   try {
-    const data = await require("./services/githubService").listIssues(
+    const prs = await require("./services/githubService").listPRs(
       req.params.owner,
       req.params.repo
     );
-    const median = require("./utils/metricsCalculator").medianResolutionTime(
-      data
-    );
-    res.json({ issuesFetched: data.length, medianResolutionHrs: median });
+    const median = require("./utils/metricsCalculator").medianPRDuration(prs);
+    res.json({ prsFetched: prs.length, medianReviewHrs: median });
   } catch (e) {
     next(e);
   }
