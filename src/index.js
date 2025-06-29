@@ -37,16 +37,14 @@ app.get("/error-test", (req, res, next) => {
   next(err);
 });
 
-app.get("/api/score/tree-test/:owner/:repo", async (req, res, next) => {
+app.get("/api/score/readme-test/:owner/:repo", async (req, res, next) => {
   try {
-    const tree = await require("./services/githubService").getRepoTree(
+    const md = await require("./services/githubService").getReadme(
       req.params.owner,
       req.params.repo
     );
-    const hasTests = require("./utils/metricsCalculator").existsTestFolder(
-      tree
-    );
-    res.json({ entries: tree.length, testFolderExists: hasTests });
+    const badgeCount = require("./utils/metricsCalculator").countBadges(md);
+    res.json({ badgeCount, snippet: md.slice(0, 100) });
   } catch (e) {
     next(e);
   }

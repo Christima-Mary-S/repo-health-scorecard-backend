@@ -120,6 +120,29 @@ function existsTestFolder(tree) {
   );
 }
 
+// src/utils/metricsCalculator.js
+
+/**
+ * Counts the number of Markdown image links (badges) in the README.
+ * Filters to URLs that include the word "badge" to avoid counting all images.
+ *
+ * @param {string} readmeMd  The raw Markdown content of the README.
+ * @returns {number} Number of badge images found.
+ */
+function countBadges(readmeMd) {
+  if (typeof readmeMd !== "string") return 0;
+  const regex = /!\[.*?\]\((.*?)\)/g;
+  let match;
+  let count = 0;
+  while ((match = regex.exec(readmeMd)) !== null) {
+    const url = match[1];
+    if (/badge/i.test(url)) {
+      count++;
+    }
+  }
+  return count;
+}
+
 module.exports = {
   computeWeeklyAverage,
   medianResolutionTime,
@@ -127,4 +150,5 @@ module.exports = {
   computeChurn,
   estimateBusFactor,
   existsTestFolder,
+  countBadges,
 };

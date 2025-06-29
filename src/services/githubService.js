@@ -190,10 +190,30 @@ async function getRepoTree(owner, repo) {
   }));
 }
 
+// src/services/githubService.js
+
+/**
+ * Fetches the repository README as raw Markdown.
+ * @param {string} owner
+ * @param {string} repo
+ * @returns {Promise<string>} The README content in UTF-8.
+ */
+async function getReadme(owner, repo) {
+  // GitHub API returns base64-encoded content by default
+  const res = await octokit.rest.repos.getReadme({
+    owner,
+    repo,
+  });
+  // Decode from base64 to UTF-8 string
+  const md = Buffer.from(res.data.content, "base64").toString("utf-8");
+  return md;
+}
+
 module.exports = {
   getCommitActivity,
   listIssues,
   listPRs,
   listContributors,
   getRepoTree,
+  getReadme,
 };
