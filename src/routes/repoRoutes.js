@@ -1,8 +1,15 @@
-const express = require("express");
-const router = express.Router();
-const repoController = require("../controllers/repoController");
+// src/routes/repoRoutes.js
 
-// GET /api/score/:owner/:repo
-router.get("/:owner/:repo", repoController.getRepoScore);
+const express = require("express");
+const { getRepoScore } = require("../controllers/repoController");
+const router = express.Router();
+
+// Existing test route
+router.get("/test", (req, res) => {
+  res.json({ ok: true });
+});
+
+// New dynamic route for owner/repo
+router.get("/:owner/:repo", getRepoScore);
 
 module.exports = router;

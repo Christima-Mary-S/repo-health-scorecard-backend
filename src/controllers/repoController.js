@@ -1,48 +1,50 @@
-const githubService = require("../services/githubService");
-const scorecardService = require("../services/scorecardService");
-const metricsCalculator = require("../utils/metricsCalculator");
+// src/controllers/repoController.js
 
-exports.getRepoScore = async (req, res, next) => {
+const { getCommitActivity } = require("../services/githubService");
+const { runScorecard } = require("../services/scorecardService");
+const { computeWeeklyAverage } = require("../utils/metricsCalculator");
+
+/**
+ * GET /api/score/:owner/:repo
+ * Returns key metrics: commitFreq and ossfScore, plus any partial errors.
+ */
+async function getRepoScore(req, res, next) {
+  const { owner, repo } = req.params;
+  let commitFreq = null;
+  let ossfScore = null;
+  const errors = {};
+
+  // 1. Fetch commit activity & compute weekly average
   try {
-    const { owner, repo } = req.params;
-
-    // 1. Fetch raw data in parallel
-    const [
-      commits,
-      issues,
-      prs,
-      contributors,
-      tree,
-      readme,
-      alerts,
-      scorecard,
-    ] = await Promise.all([
-      githubService.getCommitActivity(owner, repo),
-      githubService.listIssues(owner, repo),
-      githubService.listPRs(owner, repo),
-      githubService.listContributors(owner, repo),
-      githubService.getRepoTree(owner, repo),
-      githubService.getReadme(owner, repo),
-      githubService.getDependabotAlerts(owner, repo),
-      scorecardService.runScorecard(owner, repo),
-    ]);
-
-    // 2. Compute metrics
-    const metrics = {
-      commitFreq: metricsCalculator.computeWeeklyAverage(commits),
-      issueResTime: metricsCalculator.medianResolutionTime(issues),
-      prReviewDuration: metricsCalculator.medianPRDuration(prs),
-      contributorCount: contributors.length,
-      testFolderExists: metricsCalculator.existsTestFolder(tree),
-      badgeCount: metricsCalculator.countBadges(readme),
-      developerChurn: metricsCalculator.computeChurn(contributors, commits),
-      busFactor: metricsCalculator.estimateBusFactor(contributors, commits),
-      vulnerabilityCount: alerts.filter((a) => a.state === "open").length,
-      ossfScore: scorecard.Score,
-    };
-
-    res.json(metrics);
+    const commitData = await getCommitActivity(owner, repo);
+    commitFreq = computeWeeklyAverage(commitData);
   } catch (err) {
-    next(err);
+    console.warn(`Could not fetch commits for ${owner}/${repo}:`, err.message);
+    errors.commitError = err.message;
   }
+
+  // 2. Run OpenSSF Scorecard
+  try {
+    const scoreResult = await runScorecard(owner, repo, ["Maintained"]);
+    ossfScore = scoreResult.Score;
+  } catch (err) {
+    console.warn(`Scorecard failed for ${owner}/${repo}:`, err.message);
+    errors.scorecardError = err.message;
+  }
+
+  // 3. Build response payload
+  const response = {
+    owner,
+    repo,
+    metrics: { commitFreq, ossfScore },
+  };
+  if (Object.keys(errors).length) {
+    response.errors = errors;
+  }
+
+  return res.json(response);
+}
+
+module.exports = {
+  getRepoScore,
 };
