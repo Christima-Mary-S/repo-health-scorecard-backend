@@ -72,8 +72,46 @@ function medianPRDuration(prs) {
     : durations[mid];
 }
 
+/**
+ * Compute churn: % of contributors active 12-24 months ago who did NOT contribute in last 12 months.
+ * Currently a stub returning null (requires commit history per contributor).
+ *
+ * @param {Array<{ login: string, contributions: number }>} contributors
+ * @param {Array<{ week: number, total: number }>} commitData
+ * @returns {null}
+ */
+function computeChurn(contributors, commitData) {
+  // TODO: implement time-based contributor churn logic
+  return null;
+}
+
+/**
+ * Estimate bus factor: minimum number of top contributors whose combined contributions
+ * account for ≥50% of total contributions.
+ *
+ * @param {Array<{ login: string, contributions: number }>} contributors
+ * @returns {number}
+ */
+function estimateBusFactor(contributors) {
+  // Sort contributors by contributions descending
+  const sorted = [...contributors].sort(
+    (a, b) => b.contributions - a.contributions
+  );
+  const total = sorted.reduce((sum, c) => sum + c.contributions, 0);
+  let acc = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    acc += sorted[i].contributions;
+    if (acc >= total / 2) {
+      return i + 1; // count of contributors
+    }
+  }
+  return sorted.length;
+}
+
 module.exports = {
   computeWeeklyAverage,
   medianResolutionTime,
   medianPRDuration,
+  computeChurn,
+  estimateBusFactor,
 };

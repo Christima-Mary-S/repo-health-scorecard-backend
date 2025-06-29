@@ -113,8 +113,45 @@ async function listPRs(owner, repo) {
   return prs;
 }
 
+/**
+ * Fetch all contributors (non-anonymous) for a repository.
+ * @param {string} owner
+ * @param {string} repo
+ * @returns {Promise<Array<{ login: string, contributions: number }>>}
+ */
+async function listContributors(owner, repo) {
+  const contributors = [];
+  let page = 1;
+
+  // GitHub paginates at 100 items/page
+  while (true) {
+    const res = await octokit.rest.repos.listContributors({
+      owner,
+      repo,
+      anon: false,
+      per_page: 100,
+      page,
+    });
+    if (res.status !== 200) {
+      const err = new Error(`GitHub contributors API returned ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    contributors.push(
+      ...res.data.map((c) => ({
+        login: c.login,
+        contributions: c.contributions,
+      }))
+    );
+    if (res.data.length < 100) break;
+    page++;
+  }
+  return contributors;
+}
+
 module.exports = {
   getCommitActivity,
   listIssues,
   listPRs,
+  listContributors,
 };

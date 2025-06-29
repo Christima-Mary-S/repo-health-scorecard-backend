@@ -37,14 +37,21 @@ app.get("/error-test", (req, res, next) => {
   next(err);
 });
 
-app.get("/api/score/prs-test/:owner/:repo", async (req, res, next) => {
+app.get("/api/score/contrib-test/:owner/:repo", async (req, res, next) => {
   try {
-    const prs = await require("./services/githubService").listPRs(
-      req.params.owner,
-      req.params.repo
+    const contributors =
+      await require("./services/githubService").listContributors(
+        req.params.owner,
+        req.params.repo
+      );
+    const busFactor = require("./utils/metricsCalculator").estimateBusFactor(
+      contributors
     );
-    const median = require("./utils/metricsCalculator").medianPRDuration(prs);
-    res.json({ prsFetched: prs.length, medianReviewHrs: median });
+    // computeChurn is stubbed, will return null
+    const churn = require("./utils/metricsCalculator").computeChurn(
+      contributors
+    );
+    res.json({ contributorsFetched: contributors.length, busFactor, churn });
   } catch (e) {
     next(e);
   }
