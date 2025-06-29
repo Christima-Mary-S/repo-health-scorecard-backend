@@ -36,6 +36,46 @@ async function getCommitActivity(owner, repo) {
   return response.data;
 }
 
+/**
+ * Fetch all issues (open & closed) created in the last 6 months.
+ * @param {string} owner
+ * @param {string} repo
+ * @returns {Promise<Array<{ created_at: string, closed_at: string }>>}
+ */
+async function listIssues(owner, repo) {
+  // ISO string for 6 months ago
+  const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+  const issues = [];
+  let page = 1;
+
+  // GitHub paginates at 100 items/page
+  while (true) {
+    const res = await octokit.rest.issues.listForRepo({
+      owner,
+      repo,
+      state: "all",
+      since,
+      per_page: 100,
+      page,
+    });
+    if (res.status !== 200) {
+      const err = new Error(`GitHub issues API returned ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    // Only keep created_at & closed_at
+    const batch = res.data.map((issue) => ({
+      created_at: issue.created_at,
+      closed_at: issue.closed_at,
+    }));
+    issues.push(...batch);
+    if (batch.length < 100) break;
+    page++;
+  }
+  return issues;
+}
+
 module.exports = {
   getCommitActivity,
+  listIssues,
 };

@@ -37,16 +37,17 @@ app.get("/error-test", (req, res, next) => {
   next(err);
 });
 
-// app.get("/test-commits/:owner/:repo", async (req, res, next) => {
-//   const { owner, repo } = req.params;
-//   try {
-//     const data = await require("./services/githubService").getCommitActivity(
-//       owner,
-//       repo
-//     );
-//     // Return count of weeks and first-week sample
-//     res.json({ weeks: data.length, sample: data[0] });
-//   } catch (err) {
-//     next(err);
-//   }
-// });
+app.get("/api/score/issues-test/:owner/:repo", async (req, res, next) => {
+  try {
+    const data = await require("./services/githubService").listIssues(
+      req.params.owner,
+      req.params.repo
+    );
+    const median = require("./utils/metricsCalculator").medianResolutionTime(
+      data
+    );
+    res.json({ issuesFetched: data.length, medianResolutionHrs: median });
+  } catch (e) {
+    next(e);
+  }
+});
