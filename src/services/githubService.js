@@ -149,9 +149,51 @@ async function listContributors(owner, repo) {
   return contributors;
 }
 
+/**
+ * Fetch the full repository file tree for the default branch.
+ * @param {string} owner
+ * @param {string} repo
+ * @returns {Promise<Array<{ path: string, type: string }>>}
+ */
+async function getRepoTree(owner, repo) {
+  // 1. Get default branch SHA
+  const { data: repoInfo } = await octokit.rest.repos.get({
+    owner,
+    repo,
+  });
+  const branchSha = repoInfo.default_branch
+    ? (
+        await octokit.rest.repos.getBranch({
+          owner,
+          repo,
+          branch: repoInfo.default_branch,
+        })
+      ).data.commit.sha
+    : repoInfo.pushed_at; // fallback
+
+  // 2. Fetch the tree recursively
+  const res = await octokit.rest.git.getTree({
+    owner,
+    repo,
+    tree_sha: branchSha,
+    recursive: "1",
+  });
+  if (res.status !== 200) {
+    const err = new Error(`GitHub tree API returned ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  // Return array of { path, type } entries
+  return res.data.tree.map((entry) => ({
+    path: entry.path,
+    type: entry.type,
+  }));
+}
+
 module.exports = {
   getCommitActivity,
   listIssues,
   listPRs,
   listContributors,
+  getRepoTree,
 };

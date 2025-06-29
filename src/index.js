@@ -37,21 +37,16 @@ app.get("/error-test", (req, res, next) => {
   next(err);
 });
 
-app.get("/api/score/contrib-test/:owner/:repo", async (req, res, next) => {
+app.get("/api/score/tree-test/:owner/:repo", async (req, res, next) => {
   try {
-    const contributors =
-      await require("./services/githubService").listContributors(
-        req.params.owner,
-        req.params.repo
-      );
-    const busFactor = require("./utils/metricsCalculator").estimateBusFactor(
-      contributors
+    const tree = await require("./services/githubService").getRepoTree(
+      req.params.owner,
+      req.params.repo
     );
-    // computeChurn is stubbed, will return null
-    const churn = require("./utils/metricsCalculator").computeChurn(
-      contributors
+    const hasTests = require("./utils/metricsCalculator").existsTestFolder(
+      tree
     );
-    res.json({ contributorsFetched: contributors.length, busFactor, churn });
+    res.json({ entries: tree.length, testFolderExists: hasTests });
   } catch (e) {
     next(e);
   }

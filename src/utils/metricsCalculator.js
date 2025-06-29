@@ -108,10 +108,23 @@ function estimateBusFactor(contributors) {
   return sorted.length;
 }
 
+/**
+ * Checks if any tree entry indicates a tests/ or test/ directory.
+ *
+ * @param {Array<{ path: string, type: string }>} tree
+ * @returns {boolean}
+ */
+function existsTestFolder(tree) {
+  return tree.some(
+    (entry) => entry.type === "tree" && /^tests?\//i.test(entry.path)
+  );
+}
+
 module.exports = {
   computeWeeklyAverage,
   medianResolutionTime,
   medianPRDuration,
   computeChurn,
   estimateBusFactor,
+  existsTestFolder,
 };
