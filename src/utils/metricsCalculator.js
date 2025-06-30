@@ -143,6 +143,17 @@ function countBadges(readmeMd) {
   return count;
 }
 
+/**
+ * Count the number of open Dependabot alerts.
+ *
+ * @param {Array<{ state: string }>} alerts
+ * @returns {number} Number of alerts with state === 'open'
+ */
+function countVulnerabilities(alerts) {
+  if (!Array.isArray(alerts)) return 0;
+  return alerts.filter((a) => a.state === "open").length;
+}
+
 module.exports = {
   computeWeeklyAverage,
   medianResolutionTime,
@@ -151,4 +162,5 @@ module.exports = {
   estimateBusFactor,
   existsTestFolder,
   countBadges,
+  countVulnerabilities,
 };

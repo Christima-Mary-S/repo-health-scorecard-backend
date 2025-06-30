@@ -37,14 +37,17 @@ app.get("/error-test", (req, res, next) => {
   next(err);
 });
 
-app.get("/api/score/readme-test/:owner/:repo", async (req, res, next) => {
+app.get("/api/score/vuln-test/:owner/:repo", async (req, res, next) => {
   try {
-    const md = await require("./services/githubService").getReadme(
-      req.params.owner,
-      req.params.repo
+    const alerts =
+      await require("./services/githubService").getDependabotAlerts(
+        req.params.owner,
+        req.params.repo
+      );
+    const openCount = require("./utils/metricsCalculator").countVulnerabilities(
+      alerts
     );
-    const badgeCount = require("./utils/metricsCalculator").countBadges(md);
-    res.json({ badgeCount, snippet: md.slice(0, 100) });
+    res.json({ alertsFetched: alerts.length, openVulnerabilities: openCount });
   } catch (e) {
     next(e);
   }

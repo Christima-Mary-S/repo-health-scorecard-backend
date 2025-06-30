@@ -209,6 +209,53 @@ async function getReadme(owner, repo) {
   return md;
 }
 
+const GITHUB_ALERTS_ENDPOINT = "GET /repos/{owner}/{repo}/dependabot/alerts";
+
+/**
+ * Fetch all Dependabot alerts for a repository.
+ * Returns an empty array on 403/404 (not authorized or alerts not enabled).
+ *
+ * @param {string} owner
+ * @param {string} repo
+ * @returns {Promise<Array<{ number: number, state: string }>>}
+ */
+async function getDependabotAlerts(owner, repo) {
+  const alerts = [];
+  let page = 1;
+
+  try {
+    while (true) {
+      const res = await octokit.request(GITHUB_ALERTS_ENDPOINT, {
+        owner,
+        repo,
+        per_page: 100,
+        page,
+      });
+      // GitHub returns 200 + data array
+      alerts.push(
+        ...res.data.map((a) => ({
+          number: a.number,
+          state: a.state,
+        }))
+      );
+      if (res.data.length < 100) break;
+      page++;
+    }
+  } catch (err) {
+    // If not authorized or alerts not enabled, return empty list
+    if (err.status === 403 || err.status === 404) {
+      console.warn(
+        `Dependabot alerts not accessible for ${owner}/${repo}: ${err.message}`
+      );
+      return [];
+    }
+    // Propagate other errors
+    throw err;
+  }
+
+  return alerts;
+}
+
 module.exports = {
   getCommitActivity,
   listIssues,
@@ -216,4 +263,5 @@ module.exports = {
   listContributors,
   getRepoTree,
   getReadme,
+  getDependabotAlerts,
 };
