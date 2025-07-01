@@ -150,47 +150,31 @@ async function listContributors(owner, repo) {
 }
 
 /**
- * Fetch the full repository file tree for the default branch.
+ * Check for a `test` or `tests` directory at the repo root.
+ * Much faster than fetching the entire recursive tree.
+ *
  * @param {string} owner
  * @param {string} repo
- * @returns {Promise<Array<{ path: string, type: string }>>}
+ * @returns {Promise<Array<{ name: string, type: string }>>}
  */
 async function getRepoTree(owner, repo) {
-  // 1. Get default branch SHA
-  const { data: repoInfo } = await octokit.rest.repos.get({
+  // Fetch root‐level contents only
+  const res = await octokit.rest.repos.getContent({
     owner,
     repo,
-  });
-  const branchSha = repoInfo.default_branch
-    ? (
-        await octokit.rest.repos.getBranch({
-          owner,
-          repo,
-          branch: repoInfo.default_branch,
-        })
-      ).data.commit.sha
-    : repoInfo.pushed_at; // fallback
-
-  // 2. Fetch the tree recursively
-  const res = await octokit.rest.git.getTree({
-    owner,
-    repo,
-    tree_sha: branchSha,
-    recursive: "1",
+    path: "", // empty path == repo root
   });
   if (res.status !== 200) {
-    const err = new Error(`GitHub tree API returned ${res.status}`);
+    const err = new Error(`GitHub content API returned ${res.status}`);
     err.status = res.status;
     throw err;
   }
-  // Return array of { path, type } entries
-  return res.data.tree.map((entry) => ({
-    path: entry.path,
-    type: entry.type,
+  // res.data is an array of { name, path, type, ... }
+  return res.data.map((entry) => ({
+    name: entry.name,
+    type: entry.type, // "file" or "dir"
   }));
 }
-
-// src/services/githubService.js
 
 /**
  * Fetches the repository README as raw Markdown.

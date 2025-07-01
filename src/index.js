@@ -37,17 +37,16 @@ app.get("/error-test", (req, res, next) => {
   next(err);
 });
 
-app.get("/api/score/vuln-test/:owner/:repo", async (req, res, next) => {
+app.get("/api/score/tree-test/:owner/:repo", async (req, res, next) => {
   try {
-    const alerts =
-      await require("./services/githubService").getDependabotAlerts(
-        req.params.owner,
-        req.params.repo
-      );
-    const openCount = require("./utils/metricsCalculator").countVulnerabilities(
-      alerts
+    const rootContent = await require("./services/githubService").getRepoTree(
+      req.params.owner,
+      req.params.repo
     );
-    res.json({ alertsFetched: alerts.length, openVulnerabilities: openCount });
+    const hasTests = require("./utils/metricsCalculator").existsTestFolder(
+      rootContent
+    );
+    res.json({ entries: rootContent.length, testFolderExists: hasTests });
   } catch (e) {
     next(e);
   }

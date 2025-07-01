@@ -1,50 +1,119 @@
-// src/controllers/repoController.js
-
-const { getCommitActivity } = require("../services/githubService");
+const {
+  getCommitActivity,
+  listIssues,
+  listPRs,
+  listContributors,
+  getRepoTree,
+  getReadme,
+  getDependabotAlerts,
+} = require("../services/githubService");
 const { runScorecard } = require("../services/scorecardService");
-const { computeWeeklyAverage } = require("../utils/metricsCalculator");
+const {
+  computeWeeklyAverage,
+  medianResolutionTime,
+  medianPRDuration,
+  existsTestFolder,
+  countBadges,
+  computeChurn,
+  estimateBusFactor,
+  countVulnerabilities,
+} = require("../utils/metricsCalculator");
 
 /**
  * GET /api/score/:owner/:repo
- * Returns key metrics: commitFreq and ossfScore, plus any partial errors.
+ * Returns all ten metrics plus ossfScore; errors per metric are collected.
  */
 async function getRepoScore(req, res, next) {
   const { owner, repo } = req.params;
-  let commitFreq = null;
-  let ossfScore = null;
+  const metrics = {
+    commitFreq: null,
+    issueResTime: null,
+    prReviewDuration: null,
+    contributorCount: null,
+    testFolderExists: null,
+    badgeCount: null,
+    developerChurn: null,
+    busFactor: null,
+    vulnerabilityCount: null,
+    ossfScore: null,
+  };
   const errors = {};
 
-  // 1. Fetch commit activity & compute weekly average
-  try {
-    const commitData = await getCommitActivity(owner, repo);
-    commitFreq = computeWeeklyAverage(commitData);
-  } catch (err) {
-    console.warn(`Could not fetch commits for ${owner}/${repo}:`, err.message);
-    errors.commitError = err.message;
-  }
-
-  // 2. Run OpenSSF Scorecard
-  try {
-    const scoreResult = await runScorecard(owner, repo, ["Maintained"]);
-    ossfScore = scoreResult.Score;
-  } catch (err) {
-    console.warn(`Scorecard failed for ${owner}/${repo}:`, err.message);
-    errors.scorecardError = err.message;
-  }
-
-  // 3. Build response payload
-  const response = {
-    owner,
-    repo,
-    metrics: { commitFreq, ossfScore },
+  // Kick off all calls in parallel
+  const calls = {
+    commitData: getCommitActivity(owner, repo).catch((err) => {
+      errors.commitFreq = err.message;
+      return null;
+    }),
+    issues: listIssues(owner, repo).catch((err) => {
+      errors.issueResTime = err.message;
+      return null;
+    }),
+    prs: listPRs(owner, repo).catch((err) => {
+      errors.prReviewDuration = err.message;
+      return null;
+    }),
+    contributors: listContributors(owner, repo).catch((err) => {
+      errors.contributorCount = err.message;
+      return null;
+    }),
+    tree: getRepoTree(owner, repo).catch((err) => {
+      errors.testFolderExists = err.message;
+      return null;
+    }),
+    readme: getReadme(owner, repo).catch((err) => {
+      errors.badgeCount = err.message;
+      return null;
+    }),
+    alerts: getDependabotAlerts(owner, repo).catch((err) => {
+      errors.vulnerabilityCount = err.message;
+      return null;
+    }),
+    scoreRes: runScorecard(owner, repo).catch((err) => {
+      errors.ossfScore = err.message;
+      return null;
+    }),
   };
-  if (Object.keys(errors).length) {
-    response.errors = errors;
+
+  // Await them all
+  const [
+    commitData,
+    issues,
+    prs,
+    contributors,
+    tree,
+    readme,
+    alerts,
+    scoreRes,
+  ] = await Promise.all([
+    calls.commitData,
+    calls.issues,
+    calls.prs,
+    calls.contributors,
+    calls.tree,
+    calls.readme,
+    calls.alerts,
+    calls.scoreRes,
+  ]);
+
+  // Compute metrics (only if data arrived)
+  if (commitData) metrics.commitFreq = computeWeeklyAverage(commitData);
+  if (issues) metrics.issueResTime = medianResolutionTime(issues);
+  if (prs) metrics.prReviewDuration = medianPRDuration(prs);
+  if (contributors) {
+    metrics.contributorCount = contributors.length;
+    metrics.busFactor = estimateBusFactor(contributors);
+    metrics.developerChurn = computeChurn(contributors, commitData || []);
   }
+  if (tree) metrics.testFolderExists = existsTestFolder(tree);
+  if (readme) metrics.badgeCount = countBadges(readme);
+  if (alerts) metrics.vulnerabilityCount = countVulnerabilities(alerts);
+  if (scoreRes) metrics.ossfScore = scoreRes.Score;
+
+  const response = { owner, repo, metrics };
+  if (Object.keys(errors).length) response.errors = errors;
 
   return res.json(response);
 }
 
-module.exports = {
-  getRepoScore,
-};
+module.exports = { getRepoScore };

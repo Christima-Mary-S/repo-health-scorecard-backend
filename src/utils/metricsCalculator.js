@@ -109,18 +109,16 @@ function estimateBusFactor(contributors) {
 }
 
 /**
- * Checks if any tree entry indicates a tests/ or test/ directory.
+ * Checks if a root‐level `test` or `tests` directory exists.
  *
- * @param {Array<{ path: string, type: string }>} tree
+ * @param {Array<{ name: string, type: string }>} rootContent
  * @returns {boolean}
  */
-function existsTestFolder(tree) {
-  return tree.some(
-    (entry) => entry.type === "tree" && /^tests?\//i.test(entry.path)
+function existsTestFolder(rootContent) {
+  return rootContent.some(
+    (entry) => entry.type === "dir" && /^tests?$/i.test(entry.name)
   );
 }
-
-// src/utils/metricsCalculator.js
 
 /**
  * Counts the number of Markdown image links (badges) in the README.
