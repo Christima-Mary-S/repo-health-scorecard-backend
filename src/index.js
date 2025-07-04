@@ -41,9 +41,9 @@ app.get("/rate-limit", async (req, res, next) => {
 // 2. Issues (first 100, last 6 months) → median resolution
 app.get("/api/score/issues-test/:owner/:repo", async (req, res, next) => {
   try {
-    const { listIssues } = require("./services/githubService");
+    const { listRecentClosedIssues } = require("./services/githubService");
     const { medianResolutionTime } = require("./utils/metricsCalculator");
-    const issues = await listIssues(req.params.owner, req.params.repo);
+    const issues = await listRecentClosedIssues(req.params.owner, req.params.repo);
     const median = medianResolutionTime(issues);
     res.json({ issuesFetched: issues.length, medianResolutionHrs: median });
   } catch (e) {
@@ -143,19 +143,4 @@ app.get("/error-test", (req, res, next) => {
   const err = new Error("This is a test error");
   err.status = 418; // I'm a teapot
   next(err);
-});
-
-app.get("/api/score/tree-test/:owner/:repo", async (req, res, next) => {
-  try {
-    const rootContent = await require("./services/githubService").getRepoTree(
-      req.params.owner,
-      req.params.repo
-    );
-    const hasTests = require("./utils/metricsCalculator").existsTestFolder(
-      rootContent
-    );
-    res.json({ entries: rootContent.length, testFolderExists: hasTests });
-  } catch (e) {
-    next(e);
-  }
 });

@@ -1,6 +1,6 @@
 const {
   getCommitActivity,
-  listIssues,
+  listRecentClosedIssues,
   listPRs,
   listContributors,
   getRepoTree,
@@ -35,7 +35,7 @@ async function getRepoScore(req, res, next) {
     developerChurn: null,
     busFactor: null,
     vulnerabilityCount: null,
-    ossfScore: null,
+    // ossfScore: null,
   };
   const errors = {};
 
@@ -45,7 +45,7 @@ async function getRepoScore(req, res, next) {
       errors.commitFreq = err.message;
       return null;
     }),
-    issues: listIssues(owner, repo).catch((err) => {
+    issues: listRecentClosedIssues(owner, repo).catch((err) => {
       errors.issueResTime = err.message;
       return null;
     }),
@@ -69,10 +69,10 @@ async function getRepoScore(req, res, next) {
       errors.vulnerabilityCount = err.message;
       return null;
     }),
-    scoreRes: runScorecard(owner, repo).catch((err) => {
-      errors.ossfScore = err.message;
-      return null;
-    }),
+    // scoreRes: runScorecard(owner, repo).catch((err) => {
+    //   errors.ossfScore = err.message;
+    //   return null;
+    // }),
   };
 
   // Await them all
@@ -84,7 +84,7 @@ async function getRepoScore(req, res, next) {
     tree,
     readme,
     alerts,
-    scoreRes,
+    // scoreRes,
   ] = await Promise.all([
     calls.commitData,
     calls.issues,
@@ -93,7 +93,7 @@ async function getRepoScore(req, res, next) {
     calls.tree,
     calls.readme,
     calls.alerts,
-    calls.scoreRes,
+    // calls.scoreRes,
   ]);
 
   // Compute metrics (only if data arrived)
@@ -108,7 +108,7 @@ async function getRepoScore(req, res, next) {
   if (tree) metrics.testFolderExists = existsTestFolder(tree);
   if (readme) metrics.badgeCount = countBadges(readme);
   if (alerts) metrics.vulnerabilityCount = countVulnerabilities(alerts);
-  if (scoreRes) metrics.ossfScore = scoreRes.Score;
+  // if (scoreRes) metrics.ossfScore = scoreRes.Score;
 
   const response = { owner, repo, metrics };
   if (Object.keys(errors).length) response.errors = errors;

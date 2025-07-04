@@ -35,31 +35,40 @@ async function getCommitActivity(owner, repo) {
   // response.data is the array of weekly commit stats
   return response.data;
 }
-
 /**
- * Fetch up to 100 issues (open & closed) created in the last 6 months.
- * Only the first page to avoid long pagination.
+ * Fetch up to 100 most recent closed issues created in the last 6 months
+ * via GitHub’s Search API (fast, one call).
  *
  * @param {string} owner
  * @param {string} repo
  * @returns {Promise<Array<{ created_at: string, closed_at: string }>>}
  */
-async function listIssues(owner, repo) {
+async function listRecentClosedIssues(owner, repo) {
   const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
-  const res = await octokit.rest.issues.listForRepo({
-    owner,
-    repo,
-    state: "all",
-    since,
+  // Build the search query
+  const q = [
+    `repo:${owner}/${repo}`,
+    "type:issue",
+    "is:closed",
+    `created:>=${since}`,
+  ].join(" ");
+
+  const res = await octokit.rest.search.issuesAndPullRequests({
+    q,
+    sort: "created",
+    order: "desc",
     per_page: 100,
     page: 1,
   });
+
   if (res.status !== 200) {
-    const err = new Error(`GitHub issues API returned status ${res.status}`);
+    const err = new Error(`GitHub Search API returned ${res.status}`);
     err.status = res.status;
     throw err;
   }
-  return res.data.map((issue) => ({
+
+  // Map to the same shape as before
+  return res.data.items.map((issue) => ({
     created_at: issue.created_at,
     closed_at: issue.closed_at,
   }));
@@ -225,7 +234,7 @@ async function getDependabotAlerts(owner, repo) {
 
 module.exports = {
   getCommitActivity,
-  listIssues,
+  listRecentClosedIssues,
   listPRs,
   listContributors,
   getRepoTree,
