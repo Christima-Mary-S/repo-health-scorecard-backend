@@ -37,80 +37,63 @@ async function getCommitActivity(owner, repo) {
 }
 
 /**
- * Fetch all issues (open & closed) created in the last 6 months.
+ * Fetch up to 100 issues (open & closed) created in the last 6 months.
+ * Only the first page to avoid long pagination.
+ *
  * @param {string} owner
  * @param {string} repo
  * @returns {Promise<Array<{ created_at: string, closed_at: string }>>}
  */
 async function listIssues(owner, repo) {
-  // ISO string for 6 months ago
   const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
-  const issues = [];
-  let page = 1;
-
-  // GitHub paginates at 100 items/page
-  while (true) {
-    const res = await octokit.rest.issues.listForRepo({
-      owner,
-      repo,
-      state: "all",
-      since,
-      per_page: 100,
-      page,
-    });
-    if (res.status !== 200) {
-      const err = new Error(`GitHub issues API returned ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    // Only keep created_at & closed_at
-    const batch = res.data.map((issue) => ({
-      created_at: issue.created_at,
-      closed_at: issue.closed_at,
-    }));
-    issues.push(...batch);
-    if (batch.length < 100) break;
-    page++;
+  const res = await octokit.rest.issues.listForRepo({
+    owner,
+    repo,
+    state: "all",
+    since,
+    per_page: 100,
+    page: 1,
+  });
+  if (res.status !== 200) {
+    const err = new Error(`GitHub issues API returned status ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
-  return issues;
+  return res.data.map((issue) => ({
+    created_at: issue.created_at,
+    closed_at: issue.closed_at,
+  }));
 }
 
 /**
- * Fetch all pull requests (open & closed) created in the last 6 months.
+ * Fetch up to 100 PRs (open & closed) created in the last 6 months.
+ * Only the first page—avoids walking all 17 000+ PRs.
+ *
  * @param {string} owner
  * @param {string} repo
  * @returns {Promise<Array<{ created_at: string, merged_at: string|null, closed_at: string|null }>>}
  */
 async function listPRs(owner, repo) {
   const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
-  const prs = [];
-  let page = 1;
-
-  while (true) {
-    const res = await octokit.rest.pulls.list({
-      owner,
-      repo,
-      state: "all",
-      sort: "created",
-      direction: "asc",
-      per_page: 100,
-      page,
-    });
-    if (res.status !== 200) {
-      const err = new Error(`GitHub PRs API returned ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    const batch = res.data.map((pr) => ({
-      created_at: pr.created_at,
-      merged_at: pr.merged_at,
-      closed_at: pr.closed_at,
-    }));
-    prs.push(...batch);
-    if (batch.length < 100) break;
-    page++;
+  const res = await octokit.rest.pulls.list({
+    owner,
+    repo,
+    state: "all",
+    sort: "created",
+    direction: "asc",
+    per_page: 100,
+    page: 1,
+  });
+  if (res.status !== 200) {
+    const err = new Error(`GitHub PRs API returned status ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
-  return prs;
+  return res.data.map((pr) => ({
+    created_at: pr.created_at,
+    merged_at: pr.merged_at,
+    closed_at: pr.closed_at,
+  }));
 }
 
 /**
