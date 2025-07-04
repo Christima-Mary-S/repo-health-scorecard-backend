@@ -75,32 +75,40 @@ async function listRecentClosedIssues(owner, repo) {
 }
 
 /**
- * Fetch up to 100 PRs (open & closed) created in the last 6 months.
- * Only the first page—avoids walking all 17 000+ PRs.
+ * Fetch up to 100 most recent closed pull requests created in the last 6 months
+ * via GitHub’s Search API (fast, one call).
  *
  * @param {string} owner
  * @param {string} repo
- * @returns {Promise<Array<{ created_at: string, merged_at: string|null, closed_at: string|null }>>}
+ * @returns {Promise<Array<{ created_at: string, closed_at: string }>>}
  */
-async function listPRs(owner, repo) {
+async function listRecentClosedPRs(owner, repo) {
   const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
-  const res = await octokit.rest.pulls.list({
-    owner,
-    repo,
-    state: "all",
+  // Build the search query
+  const q = [
+    `repo:${owner}/${repo}`,
+    "type:pr",
+    "is:closed",
+    `created:>=${since}`,
+  ].join(" ");
+
+  const res = await octokit.rest.search.issuesAndPullRequests({
+    q,
     sort: "created",
-    direction: "asc",
+    order: "desc",
     per_page: 100,
     page: 1,
   });
+
   if (res.status !== 200) {
-    const err = new Error(`GitHub PRs API returned status ${res.status}`);
+    const err = new Error(`GitHub Search API returned ${res.status}`);
     err.status = res.status;
     throw err;
   }
-  return res.data.map((pr) => ({
+
+  // The Search API returns PRs as items with created_at & closed_at
+  return res.data.items.map((pr) => ({
     created_at: pr.created_at,
-    merged_at: pr.merged_at,
     closed_at: pr.closed_at,
   }));
 }
@@ -235,7 +243,7 @@ async function getDependabotAlerts(owner, repo) {
 module.exports = {
   getCommitActivity,
   listRecentClosedIssues,
-  listPRs,
+  listRecentClosedPRs,
   listContributors,
   getRepoTree,
   getReadme,

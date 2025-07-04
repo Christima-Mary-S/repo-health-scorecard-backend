@@ -43,7 +43,10 @@ app.get("/api/score/issues-test/:owner/:repo", async (req, res, next) => {
   try {
     const { listRecentClosedIssues } = require("./services/githubService");
     const { medianResolutionTime } = require("./utils/metricsCalculator");
-    const issues = await listRecentClosedIssues(req.params.owner, req.params.repo);
+    const issues = await listRecentClosedIssues(
+      req.params.owner,
+      req.params.repo
+    );
     const median = medianResolutionTime(issues);
     res.json({ issuesFetched: issues.length, medianResolutionHrs: median });
   } catch (e) {
@@ -54,9 +57,9 @@ app.get("/api/score/issues-test/:owner/:repo", async (req, res, next) => {
 // 3. PRs (first 100, last 6 months) → median review duration
 app.get("/api/score/prs-test/:owner/:repo", async (req, res, next) => {
   try {
-    const { listPRs } = require("./services/githubService");
+    const { listRecentClosedPRs } = require("./services/githubService");
     const { medianPRDuration } = require("./utils/metricsCalculator");
-    const prs = await listPRs(req.params.owner, req.params.repo);
+    const prs = await listRecentClosedPRs(req.params.owner, req.params.repo);
     const median = medianPRDuration(prs);
     res.json({ prsFetched: prs.length, medianReviewHrs: median });
   } catch (e) {

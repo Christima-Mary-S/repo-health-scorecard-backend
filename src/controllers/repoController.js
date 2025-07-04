@@ -1,7 +1,7 @@
 const {
   getCommitActivity,
   listRecentClosedIssues,
-  listPRs,
+  listRecentClosedPRs,
   listContributors,
   getRepoTree,
   getReadme,
@@ -49,8 +49,8 @@ async function getRepoScore(req, res, next) {
       errors.issueResTime = err.message;
       return null;
     }),
-    prs: listPRs(owner, repo).catch((err) => {
-      errors.prReviewDuration = err.message;
+    prs: listRecentClosedPRs(owner, repo).catch((err) => {
+      errors.listRecentClosedPRs = err.message;
       return null;
     }),
     contributors: listContributors(owner, repo).catch((err) => {
