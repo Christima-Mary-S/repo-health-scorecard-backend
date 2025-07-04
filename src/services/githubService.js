@@ -1,5 +1,6 @@
 const { Octokit } = require("@octokit/rest");
 const config = require("../config");
+const { computeDeveloperChurn } = require("../utils/metricsCalculator");
 
 // Initialize Octokit with authentication token from config
 const octokit = new Octokit({
@@ -240,6 +241,75 @@ async function getDependabotAlerts(owner, repo) {
   return alerts;
 }
 
+/**
+ * Compute developer churn % by sampling top contributors.
+ *
+ * @param {string} owner
+ * @param {string} repo
+ * @param {number} sampleSize     how many top contributors to sample (default 50)
+ * @returns {Promise<number|null>} churn percentage (0–100) or null if no old contributors
+ */
+async function getDeveloperChurn(owner, repo, sampleSize = 50) {
+  // 1. Fetch the top `sampleSize` contributors
+  const contribRes = await octokit.rest.repos.listContributors({
+    owner,
+    repo,
+    anon: false,
+    per_page: sampleSize,
+    page: 1,
+  });
+  if (contribRes.status !== 200) {
+    const err = new Error(`Contributors API returned ${contribRes.status}`);
+    err.status = contribRes.status;
+    throw err;
+  }
+  const logins = contribRes.data.map((c) => c.login);
+
+  // 2. Define time windows
+  const twelveMoAgo = new Date(
+    Date.now() - 365 * 24 * 60 * 60 * 1000
+  ).toISOString();
+  const twoYearsAgo = new Date(
+    Date.now() - 2 * 365 * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  // 3. Build two Sets in parallel
+  const oldSetPromise = Promise.all(
+    logins.map(async (login) => {
+      const r = await octokit.rest.repos.listCommits({
+        owner,
+        repo,
+        author: login,
+        since: twoYearsAgo,
+        until: twelveMoAgo,
+        per_page: 1,
+      });
+      return r.data.length > 0 ? login : null;
+    })
+  ).then((arr) => new Set(arr.filter(Boolean)));
+
+  const recentSetPromise = Promise.all(
+    logins.map(async (login) => {
+      const r = await octokit.rest.repos.listCommits({
+        owner,
+        repo,
+        author: login,
+        since: twelveMoAgo,
+        per_page: 1,
+      });
+      return r.data.length > 0 ? login : null;
+    })
+  ).then((arr) => new Set(arr.filter(Boolean)));
+
+  const [oldSet, recentSet] = await Promise.all([
+    oldSetPromise,
+    recentSetPromise,
+  ]);
+
+  // 4. Delegate to your util
+  return computeDeveloperChurn(oldSet, recentSet);
+}
+
 module.exports = {
   getCommitActivity,
   listRecentClosedIssues,
@@ -248,4 +318,5 @@ module.exports = {
   getRepoTree,
   getReadme,
   getDependabotAlerts,
+  getDeveloperChurn,
 };

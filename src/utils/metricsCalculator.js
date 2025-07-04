@@ -152,6 +152,26 @@ function countVulnerabilities(alerts) {
   return alerts.filter((a) => a.state === "open").length;
 }
 
+/**
+ * Compute developer churn % given two sets of logins:
+ *  - oldSet:   contributors active 12–24 months ago
+ *  - recentSet: contributors active in last 12 months
+ *
+ * @param {Set<string>} oldSet
+ * @param {Set<string>} recentSet
+ * @returns {number|null} churn% or null if no old contributors
+ */
+function computeDeveloperChurn(oldSet, recentSet) {
+  if (!(oldSet instanceof Set) || oldSet.size === 0) {
+    return null;
+  }
+  let churnCount = 0;
+  for (const login of oldSet) {
+    if (!recentSet.has(login)) churnCount++;
+  }
+  return (churnCount / oldSet.size) * 100;
+}
+
 module.exports = {
   computeWeeklyAverage,
   medianResolutionTime,
@@ -161,4 +181,5 @@ module.exports = {
   existsTestFolder,
   countBadges,
   countVulnerabilities,
+  computeDeveloperChurn,
 };

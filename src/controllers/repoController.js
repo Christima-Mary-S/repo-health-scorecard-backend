@@ -6,22 +6,24 @@ const {
   getRepoTree,
   getReadme,
   getDependabotAlerts,
+  getDeveloperChurn,
 } = require("../services/githubService");
-const { runScorecard } = require("../services/scorecardService");
+
+// const { runScorecard } = require('../services/scorecardService'); // Uncomment if using OSSF Scorecards
+
 const {
   computeWeeklyAverage,
   medianResolutionTime,
   medianPRDuration,
   existsTestFolder,
   countBadges,
-  computeChurn,
   estimateBusFactor,
   countVulnerabilities,
 } = require("../utils/metricsCalculator");
 
 /**
  * GET /api/score/:owner/:repo
- * Returns all ten metrics plus ossfScore; errors per metric are collected.
+ * Returns repository health metrics.
  */
 async function getRepoScore(req, res, next) {
   const { owner, repo } = req.params;
@@ -35,11 +37,10 @@ async function getRepoScore(req, res, next) {
     developerChurn: null,
     busFactor: null,
     vulnerabilityCount: null,
-    // ossfScore: null,
   };
   const errors = {};
 
-  // Kick off all calls in parallel
+  // Execute all data-fetching calls in parallel
   const calls = {
     commitData: getCommitActivity(owner, repo).catch((err) => {
       errors.commitFreq = err.message;
@@ -50,7 +51,7 @@ async function getRepoScore(req, res, next) {
       return null;
     }),
     prs: listRecentClosedPRs(owner, repo).catch((err) => {
-      errors.listRecentClosedPRs = err.message;
+      errors.prReviewDuration = err.message;
       return null;
     }),
     contributors: listContributors(owner, repo).catch((err) => {
@@ -69,50 +70,56 @@ async function getRepoScore(req, res, next) {
       errors.vulnerabilityCount = err.message;
       return null;
     }),
-    // scoreRes: runScorecard(owner, repo).catch((err) => {
-    //   errors.ossfScore = err.message;
-    //   return null;
-    // }),
+    churn: getDeveloperChurn(owner, repo).catch((err) => {
+      errors.developerChurn = err.message;
+      return null;
+    }),
   };
 
-  // Await them all
-  const [
-    commitData,
-    issues,
-    prs,
-    contributors,
-    tree,
-    readme,
-    alerts,
-    // scoreRes,
-  ] = await Promise.all([
-    calls.commitData,
-    calls.issues,
-    calls.prs,
-    calls.contributors,
-    calls.tree,
-    calls.readme,
-    calls.alerts,
-    // calls.scoreRes,
-  ]);
+  const [commitData, issues, prs, contributors, tree, readme, alerts, churn] =
+    await Promise.all([
+      calls.commitData,
+      calls.issues,
+      calls.prs,
+      calls.contributors,
+      calls.tree,
+      calls.readme,
+      calls.alerts,
+      calls.churn,
+    ]);
 
-  // Compute metrics (only if data arrived)
-  if (commitData) metrics.commitFreq = computeWeeklyAverage(commitData);
-  if (issues) metrics.issueResTime = medianResolutionTime(issues);
-  if (prs) metrics.prReviewDuration = medianPRDuration(prs);
+  // Compute metrics from fetched data
+  if (commitData) {
+    metrics.commitFreq = computeWeeklyAverage(commitData);
+  }
+  if (issues) {
+    metrics.issueResTime = medianResolutionTime(issues);
+  }
+  if (prs) {
+    metrics.prReviewDuration = medianPRDuration(prs);
+  }
   if (contributors) {
     metrics.contributorCount = contributors.length;
     metrics.busFactor = estimateBusFactor(contributors);
-    metrics.developerChurn = computeChurn(contributors, commitData || []);
   }
-  if (tree) metrics.testFolderExists = existsTestFolder(tree);
-  if (readme) metrics.badgeCount = countBadges(readme);
-  if (alerts) metrics.vulnerabilityCount = countVulnerabilities(alerts);
-  // if (scoreRes) metrics.ossfScore = scoreRes.Score;
+  // Developer churn from service
+  if (churn !== null) {
+    metrics.developerChurn = churn;
+  }
+  if (tree) {
+    metrics.testFolderExists = existsTestFolder(tree);
+  }
+  if (readme) {
+    metrics.badgeCount = countBadges(readme);
+  }
+  if (alerts) {
+    metrics.vulnerabilityCount = countVulnerabilities(alerts);
+  }
 
   const response = { owner, repo, metrics };
-  if (Object.keys(errors).length) response.errors = errors;
-
+  if (Object.keys(errors).length) {
+    response.errors = errors;
+  }
   return res.json(response);
 }
 
