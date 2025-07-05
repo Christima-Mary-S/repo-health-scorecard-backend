@@ -3,10 +3,10 @@ const {
   listRecentClosedIssues,
   listRecentClosedPRs,
   listContributors,
-  getRepoTree,
   getReadme,
   getDependabotAlerts,
   getDeveloperChurn,
+  getTestPresence,
 } = require("../services/githubService");
 
 // const { runScorecard } = require('../services/scorecardService'); // Uncomment if using OSSF Scorecards
@@ -15,11 +15,12 @@ const {
   computeWeeklyAverage,
   medianResolutionTime,
   medianPRDuration,
-  existsTestFolder,
   countBadges,
   estimateBusFactor,
   countVulnerabilities,
 } = require("../utils/metricsCalculator");
+
+const { aggregateScore } = require("../utils/scoreAggregator");
 
 /**
  * GET /api/score/:owner/:repo
@@ -37,6 +38,7 @@ async function getRepoScore(req, res, next) {
     developerChurn: null,
     busFactor: null,
     vulnerabilityCount: null,
+    overallScore: null,
   };
   const errors = {};
 
@@ -58,7 +60,7 @@ async function getRepoScore(req, res, next) {
       errors.contributorCount = err.message;
       return null;
     }),
-    tree: getRepoTree(owner, repo).catch((err) => {
+    testExists: getTestPresence(owner, repo).catch((err) => {
       errors.testFolderExists = err.message;
       return null;
     }),
@@ -76,17 +78,25 @@ async function getRepoScore(req, res, next) {
     }),
   };
 
-  const [commitData, issues, prs, contributors, tree, readme, alerts, churn] =
-    await Promise.all([
-      calls.commitData,
-      calls.issues,
-      calls.prs,
-      calls.contributors,
-      calls.tree,
-      calls.readme,
-      calls.alerts,
-      calls.churn,
-    ]);
+  const [
+    commitData,
+    issues,
+    prs,
+    contributors,
+    testExists,
+    readme,
+    alerts,
+    churn,
+  ] = await Promise.all([
+    calls.commitData,
+    calls.issues,
+    calls.prs,
+    calls.contributors,
+    calls.testExists,
+    calls.readme,
+    calls.alerts,
+    calls.churn,
+  ]);
 
   // Compute metrics from fetched data
   if (commitData) {
@@ -106,15 +116,15 @@ async function getRepoScore(req, res, next) {
   if (churn !== null) {
     metrics.developerChurn = churn;
   }
-  if (tree) {
-    metrics.testFolderExists = existsTestFolder(tree);
-  }
+  if (testExists !== null) metrics.testFolderExists = testExists;
   if (readme) {
     metrics.badgeCount = countBadges(readme);
   }
   if (alerts) {
     metrics.vulnerabilityCount = countVulnerabilities(alerts);
   }
+
+  metrics.overallScore = aggregateScore(metrics);
 
   const response = { owner, repo, metrics };
   if (Object.keys(errors).length) {

@@ -86,21 +86,6 @@ app.get("/api/score/contrib-test/:owner/:repo", async (req, res, next) => {
   }
 });
 
-// 5. Root‐level tree → test folder presence
-app.get("/api/score/tree-test/:owner/:repo", async (req, res, next) => {
-  try {
-    const { getRepoTree } = require("./services/githubService");
-    const { existsTestFolder } = require("./utils/metricsCalculator");
-    const rootContent = await getRepoTree(req.params.owner, req.params.repo);
-    res.json({
-      entries: rootContent.length,
-      testFolderExists: existsTestFolder(rootContent),
-    });
-  } catch (e) {
-    next(e);
-  }
-});
-
 // 6. README → badge count
 app.get("/api/score/readme-test/:owner/:repo", async (req, res, next) => {
   try {

@@ -151,30 +151,39 @@ async function listContributors(owner, repo) {
 }
 
 /**
- * Check for a `test` or `tests` directory at the repo root.
- * Much faster than fetching the entire recursive tree.
+ * Returns true if the repo contains any test files or __tests__ folders anywhere.
+ *
+ * Uses GitHub’s Code Search API to look for:
+ *  - any filename matching *.test.*
+ *  - any path segment named __tests__
  *
  * @param {string} owner
  * @param {string} repo
- * @returns {Promise<Array<{ name: string, type: string }>>}
+ * @returns {Promise<boolean>}
  */
-async function getRepoTree(owner, repo) {
-  // Fetch root‐level contents only
-  const res = await octokit.rest.repos.getContent({
-    owner,
-    repo,
-    path: "", // empty path == repo root
-  });
-  if (res.status !== 200) {
-    const err = new Error(`GitHub content API returned ${res.status}`);
-    err.status = res.status;
-    throw err;
+async function getTestPresence(owner, repo) {
+  // Patterns to try
+  const queries = [
+    // catches files named *.test.js, *.test.tsx, etc.
+    `repo:${owner}/${repo} filename:*.test.*`,
+    // catches any directory named __tests__ at any depth
+    `repo:${owner}/${repo} in:path __tests__`,
+  ];
+
+  for (const q of queries) {
+    const res = await octokit.rest.search.code({
+      q,
+      per_page: 1,
+      page: 1,
+    });
+    if (res.status !== 200) {
+      throw new Error(`Code search API returned ${res.status}`);
+    }
+    if (res.data.total_count > 0) {
+      return true;
+    }
   }
-  // res.data is an array of { name, path, type, ... }
-  return res.data.map((entry) => ({
-    name: entry.name,
-    type: entry.type, // "file" or "dir"
-  }));
+  return false;
 }
 
 /**
@@ -315,7 +324,7 @@ module.exports = {
   listRecentClosedIssues,
   listRecentClosedPRs,
   listContributors,
-  getRepoTree,
+  getTestPresence,
   getReadme,
   getDependabotAlerts,
   getDeveloperChurn,
