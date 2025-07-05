@@ -33,7 +33,7 @@ A weighted formula (see `utils/scoreAggregator.js`) yields **Overall Score 0–1
 ## Quick Start (research use)
 
 ```bash
-git clone <repo>
+git clone https://github.com/Christima-Mary-S/repo-health-scorecard-backend.git
 cd repo-health-scorecard-backend
 npm i
 # .env needs a GitHub PAT with security_events or repo scope
